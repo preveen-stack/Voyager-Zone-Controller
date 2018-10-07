@@ -1,4 +1,3 @@
-
 # Copyright 2017, Digi International Inc.
 #
 # Permission to use, copy, modify, and/or distribute this software for any
@@ -12,21 +11,12 @@
 # WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-from flask import Flask
-from flask_mqtt import Mqtt
-from flask import request
 
-from flask_cors import CORS
-
-from pymongo import MongoClient
-import time
 from digi.xbee.devices import XBeeDevice
 import re
 from flask_mongoengine import MongoEngine
 
 INIT_DATA = "row1lat28lng29stow20 row2lat35lng80stow20"
-
-
 
 # TODO: Replace with the serial port where your local module is connected to.
 PORT = "/dev/ttyUSB0"
@@ -34,35 +24,23 @@ PORT = "/dev/ttyUSB0"
 BAUD_RATE = 9600
 
 
+from flask import Flask
+from flask_mqtt import Mqtt
+
+from pymongo import MongoClient
+import time
 
 app = Flask(__name__)
 
-CORS(app)
-
 app.config.from_pyfile('config.py')
 
-toSend=''
+toSend = ''
 mqtt = Mqtt(app)
 #mqtt.subscribe('voyager')
 
 db = MongoEngine(app)
 client = MongoClient('localhost', 27017)
 mongo = client.voyagerDB
-
-
-@app.route('/sendCommand', methods=['POST'])
-def sendCommandMethod():
-    content = request.get_json(force=True)
-    print(content)
-    command = content['command']
-    trackerID = content['trackerID']
-    #TODO send commands to xbee device
-    print("sending command "+command)
-    mqtt.publish('xbee','STOP')
-    return "success"
-
-from views import *
-from models import *
 
 
 @mqtt.on_connect()
@@ -83,8 +61,57 @@ def handle_mqtt_message(client, userdata, message):
 
 @mqtt.on_log()
 def handle_logging(client, userdata, level, buf):
-    logged=True
-    #print(level, buf)
+    print(level, buf)
+
+
+device = XBeeDevice(PORT, BAUD_RATE)
+
+class SimpleUpdate(db.Document):
+    angle = db.FloatField()
+    pvVoltage = db.FloatField()
+    batteryVoltage = db.FloatField()
+
+def main():
+    print(" +-------------------------------------------------+")
+    print(" | 			ZC 			      |")
+    print(" +-------------------------------------------------+\n")
+
+    try:
+        device.open()
+
+        device.flush_queues()
+
+        print("Waiting for data...\n")
+
+        while True:
+            global toSend
+            if toSend != '':
+                 device.send_data_broadcast(toSend)
+                 toSend = ''
+
+            xbee_message = device.read_data()
+            if xbee_message is not None:
+                 print("From %s >> %s" % (xbee_message.remote_device.get_64bit_addr(), xbee_message.data.decode()))
+                 payload=xbee_message.data.decode()
+                 if(payload == "REQUEST_INIT_DATA"):
+                    device.send_data_broadcast(INIT_DATA)
+                    print("init data broadcasted")
+                 elif 'angle' in payload:
+                    arr = re.findall(r"[-+]?\d*\.\d+|\d+",payload)
+                    updateData = SimpleUpdate(angle=float(arr[0]),pvVoltage=float(arr[1]),batteryVoltage=float(arr[2]))
+                    updateData.save()
+                    mqtt.publish('voyager/site001',payload)
+                    print("message published")
+                 else:
+                    print(payload)
+    finally:
+        if device is not None and device.is_open():
+            device.close()
+
+
+from views import *
+
 
 if __name__ == '__main__':
+    main()
     app.run(host='0.0.0.0', port=5000)
