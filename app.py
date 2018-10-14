@@ -31,16 +31,20 @@ BAUD_RATE = 9600
 
 app = Flask(__name__)
 
-
+app.config.from_pyfile('config.py')
 
 toSend=''
-mqtt = Mqtt(app)
+#mqtt = Mqtt(app)
 #mqtt.subscribe('voyager')
 
 db = MongoEngine(app)
 client = MongoClient('localhost', 27017)
 mongo = client.voyagerDB
 
+from views import *
+from models import *
+
+"""
 @mqtt.on_connect()
 def handle_connect(client, userdata, flags, rc):
     print('subscribing to topics now')
@@ -134,9 +138,10 @@ def main():
             device.close()
 
 
+"""
 
 if __name__ == '__main__':
-    main()
-    app.run(host='0.0.0.0', port=5000)
+    #main()
+    app.run(host='0.0.0.0', port=5000, use_reloader=True)
 
 
