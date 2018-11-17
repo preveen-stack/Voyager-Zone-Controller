@@ -56,7 +56,7 @@ def sendCommandMethod():
     print(content)
     command = content['command']
     trackerID = content['trackerID']
-    #TODO send commands to xbee device
+    #TODO remove mqtt addd http
     print("sending command "+command)
     mqtt.publish('xbee','STOP')
     return "success"

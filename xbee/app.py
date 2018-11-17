@@ -71,6 +71,8 @@ def handle_logging(client, userdata, level, buf):
 
 device = XBeeDevice(PORT, BAUD_RATE)
 
+#TODO remove mqtt addd http
+
 
 def main():
     print(" +-------------------------------------------------+")
