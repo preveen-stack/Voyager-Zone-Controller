@@ -1,43 +1,5 @@
 from app import db
 
-class MotorUpdate(db.EmbeddedDocument):
-    current = db.IntField()
-    status = db.StringField()
-
-class Battery(db.EmbeddedDocument):
-    soc = db.FloatField()
-    temp = db.FloatField()
-    current = db.FloatField()
-    voltage = db.FloatField()
-
-class PV(db.EmbeddedDocument):
-    voltage = db.FloatField()
-    current = db.FloatField()
-
-class Tracking(db.EmbeddedDocument):
-    targetAngle = db.FloatField()
-    sunAngle = db.FloatField()
-    inclinometerAngle = db.FloatField()
-
-class Misc(db.EmbeddedDocument):
-    RTC = db.FloatField()
-    snowDepth = db.FloatField()
-    windSpeed = db.FloatField()
-    ambientTemp = db.FloatField()
-    boardTemp = db.FloatField()
-    timeToStow = db.FloatField()
-
-
-class Led(db.EmbeddedDocument):
-    power = db.StringField()
-    comm = db.StringField()
-    motor = db.StringField()
-    mode = db.StringField()
-    master = db.StringField()
-
-class Event(db.EmbeddedDocument):
-    time = db.FloatField()
-    desc = db.StringField()
 
 class Stow(db.EmbeddedDocument):
     snowStow = db.FloatField()
@@ -92,7 +54,7 @@ class TrendsData(db.EmbeddedDocument):
         numberOfTrackers = db.StringField()
         trackers = db.EmbeddedDocumentListField(Trackers)
         operationalNo = db.StringField()
-
+"""
 class UpdateData(db.Document):
     trackerID = db.StringField()
     timeStamp = db.FloatField()
@@ -104,6 +66,25 @@ class UpdateData(db.Document):
     led = db.EmbeddedDocumentField(Led)
     events = db.ListField(db.EmbeddedDocumentField(Event))
     meta = {'collection': 'update_data'}
+"""
+class PowerTable(db.Document):
+    trackerID = db.StringField()
+    timeStamp = db.StringField()
+    pvCurrent = db.StringField()
+    pvVoltage = db.StringField()
+    batteryCurrent = db.StringField()
+    batteryVoltage = db.StringField()
+    meta = {'collection': 'powerTable'}
+
+class StatusTable(db.Document):
+    trackerID = db.StringField()
+    timeStamp = db.StringField()
+    currentMode = db.StringField()
+    currentAngle = db.FloatField()
+    motor = db.StringField()
+    errorCode = db.StringField()
+    calculatedAngle = db.FloatField()
+    meta = {'collection': 'statusTable'}
 
 class SimpleUpdate(db.Document):
     angle = db.FloatField()
