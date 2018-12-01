@@ -16,7 +16,7 @@ from flask_mqtt import Mqtt
 from flask import request
 
 from flask_cors import CORS
-
+from optAngle import *
 from pymongo import MongoClient
 
 
@@ -114,9 +114,9 @@ def main():
 
                 xbee_network.clear()
 
-                # Callback for discovered devices. TODO save device ID to db in seperate collection
+                # Callback for discovered devices.  #save device ID to db in seperate collection
                 def callback_device_discovered(remote):
-                    xbee_device = XbeeDevices(deviceID=device_id)              #TODO how to get device_id?
+                    xbee_device = XbeeDevices(deviceID=remote, rowID=row_id)              #TODO how to get row_id?
                     xbee_device.save()
                     print("Device discovered: %s" % remote)
 
@@ -141,16 +141,17 @@ def main():
 
             xbee_message = device.read_data()
             if xbee_message is not None:
-                 print("From %s >> %s" % (xbee_message.remote_device.get_64bit_addr(),xbee_message.data.decode()))
+                 print("From %s >> %s" % (xbee_message.remote_device.get_64bit_addr(), xbee_message.data.decode()))
                  payload=xbee_message.data.decode()
                  if(payload['CMD'] == "DPWR"):
                     #TODO save date to power table along with timestamp, pv current, pv voltage,
-                    #TODO   batt current, battery voltage under payload['VALUES'] as a comma seperated
-                    #TODO  string in same order
+                    #TODO batt current, battery voltage under payload['VALUES'] as a comma seperated
+                    #TODO string in same order
                     values = payload['VALUES']
                     values = values.split(",")
                         
-                    power_table = PowerTable(timeStamp=payload['TS'], pvCurrent=values[0], pvVoltage=values[1], battCurrent=values[2], battVoltage=values[3])
+                    power_table = PowerTable(timeStamp=payload['TS'], pvCurrent=values[0], pvVoltage=values[1],
+                                             battCurrent=values[2], battVoltage=values[3])
                     power_table.save()
                     device.send_data_broadcast(INIT_DATA)
 
@@ -159,22 +160,32 @@ def main():
                      # TODO save date to status table, 5 paramters along with time stamp that are
                      # TODO payload['MODE'], payload['ANGLE'], payload['MOTOR'], payload['ERROR'], each one
                      # TODO is received as  string , only angle has to be stored as number
-                     status_table = StatusTable(timeStamp=payload['TS'], mode=payload['MODE'], angle=float(payload['ANGLE']), motor=payload['MOTOR'], error=payload['ERROR'])
+
+                     static_data = StaticData.objects.get(deviceID=payload['DID'])
+                     latitude = static_data['controllerInfo']['position']['lat']
+                     longitude = static_data['controllerInfo']['position']['lng']
+                     azimuth_angle = static_data['controllerInfo']['position']['azimuthDeviation']
+
+                     computedAngle = opt_Tilt(latitude, longitude, azimuth_angle)
+                     computedAngle=(degrees(computedAngle))
+                     status_table = StatusTable(timeStamp=payload['TS'], mode=payload['MODE'],
+                                                angle=float(payload['ANGLE']), motor=payload['MOTOR'],
+                                                error=payload['ERROR'], computedAngle=computedAngle)
                      status_table.save()
                      device.send_data_broadcast(INIT_DATA)
 
                      print("init data broadcasted")
 
                  elif 'angle' in payload:
-                    arr=re.findall(r"[-+]?\d*\.\d+|\d+",payload)
-                    updateData = SimpleUpdate(angle=float(arr[0]),pvVoltage=float(arr[1]),batteryVoltage=float(arr[2]))
+                    arr=re.findall(r"[-+]?\d*\.\d+|\d+", payload)
+                    updateData = SimpleUpdate(angle=float(arr[0]), pvVoltage=float(arr[1]), batteryVoltage=float(arr[2]))
                     updateData.save()
 
                     content = request.get_json(force=True)
                     print(content)
                     # TODO publish mqtt message to update siteDB
                     print("message published")
-                 else :
+                 else:
                     print(payload)
     finally:
         if device is not None and device.is_open():

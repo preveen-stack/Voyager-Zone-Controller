@@ -20,15 +20,13 @@ class Position(db.EmbeddedDocument):
     pitch_west = db.FloatField()
     rowWidth = db.FloatField()
 
-class Motor(db.EmbeddedDocument):
-    trackingResolution = db.FloatField()
 
 class ControllerInfo(db.EmbeddedDocument):
     siteName = db.StringField()
     siteID = db.StringField()
     zoneID = db.StringField()
+    rowID = db.StringField()
     firmwareVersion = db.StringField()
-    macID = db.StringField()
     boardSerialNo = db.IntField()
     threshold_wind_speed = db.FloatField()
     table_length = db.FloatField()
@@ -92,14 +90,15 @@ class SimpleUpdate(db.Document):
     batteryVoltage = db.FloatField()
 
 class StaticData(db.Document):
-    trackerID = db.StringField()
+    trackerID = db.StringField(unique=True)
+    deviceID = db.StringField(unique=True)
     controllerInfo = db.EmbeddedDocumentField(ControllerInfo)
-    motor = db.EmbeddedDocumentField(Motor)
+    discovered = db.BooleanField(default=False)
     meta = {'collection': 'static_data'}
 
 class XbeeDevices(db.Document):
-    deviceId = db.StringField()
-    rowId = db.StringField()
+    deviceID = db.StringField()
+    rowID = db.StringField()
     meta = {'collection': 'xbeeDevices'}
 
 class Trends(db.Document):

@@ -1,0 +1,71 @@
+[
+  {
+    "trackerID" : "tracker001",
+    "deviceID": "AB000123",
+    "controllerInfo": {
+      "siteName": "china-province",
+      "siteID": "site0001",
+      "zoneID": "zone0001",
+      "rowID": "row0001",
+      "firmwareVersion": "v1.0",
+      "boardSerialNo": "234",
+      "threshold_wind_speed": 10,
+      "table_length": 4,
+      "table_width": 2,
+      "stow": {
+        "snowStow": 12.2,
+        "windStow": 12.2,
+        "nightStow": 12.2,
+        "cleanStow": -12.2
+      },
+      "limits": {
+        "east": 90.3,
+        "west": 35.5
+      },
+      "position": {
+        "lat": 12.24,
+        "lng": -10.24,
+        "alt": -10,
+        "azimuthDeviation": 45,
+        "pitch_east": 6.2,
+        "pitch_west": 8.2,
+        "rowWidth": 4000
+      }
+    }
+
+  },
+  {
+    "trackerID": "tracker002",
+    "deviceID": "AB000124",
+    "controllerInfo": {
+      "siteName": "china-province",
+      "siteID": "site0001",
+      "zoneID": "zone0001",
+      "rowID": "row0001",
+      "firmwareVersion": "v1.0",
+      "boardSerialNo": "234",
+      "threshold_wind_speed": 10,
+      "table_length": 4,
+      "table_width": 2,
+      "stow": {
+        "snowStow": 12.2,
+        "windStow": 12.2,
+        "nightStow": 12.2,
+        "cleanStow": -12.2
+      },
+      "limits": {
+        "east": 90.3,
+        "west": 35.5
+      },
+      "position": {
+        "lat": 12.24,
+        "lng": -10.24,
+        "alt": -10,
+        "azimuthDeviation": 45,
+        "pitch_east": 6.2,
+        "pitch_west": 8.2,
+        "rowWidth": 4000
+      }
+    }
+}
+]
