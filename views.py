@@ -1,16 +1,38 @@
 from app import app
 from models import *
+import json
 from flask import jsonify, request
 import datetime
+from werkzeug import secure_filename
+
+def getJSON(filePath):
+    with open(filePath, 'r') as fp:
+        return json.load(fp)
 
 @app.route('/getCommissioningData', methods = ['GET'])
 def commisioningMethod():
     static_objects = []
-    print(StaticData.objects.count())
-    for i in range(StaticData.objects.count()):
-        tracker = StaticData.objects.get(id=static_objects[i].id)
-        static_objects.append(tracker)
-    return jsonify(StaticData.objects())
+    ids = []
+    for data in StaticData.objects():
+        ids.append({"rowID": data['controllerInfo']['rowID'], "deviceID": data['deviceID']})
+
+    for id in ids:
+        try:
+            xbee = XbeeDevices.objects.get(deviceID=id['deviceID'])
+            if xbee.rowID == id['rowID']:
+                static = StaticData.objects.get(deviceID=id['deviceID'])
+                static.discovered = True
+                static.save()
+        except:
+            static = StaticData.objects.get(deviceID=id['deviceID'])
+            static.discovered = False
+            static.save()
+
+    for data in StaticData.objects():
+        static_objects.append(data)
+
+    return jsonify({"staticData": static_objects})
+
 
 @app.route('/getCurrentTrackerInfo', methods=['GET'])
 def currentTrackerMethod():
@@ -79,6 +101,42 @@ def trendsMethod():
                     break
             coordinates.append({trackerID[i]: coordinate})
         return jsonify({"coordinates": coordinates})
+
+@app.route('/loadStaticData', methods=['POST'])
+def loadStaticDataMethod():
+    f = request.files['file']
+    f.save('staticData.json')
+    loadedList = getJSON('C:\\Users\\amd\\PycharmProjects\\zc-noc\\staticData.json')
+    for json in loadedList:
+        try:
+            static_data = StaticData(trackerID=json['trackerID'], deviceID=json['deviceID'],
+                                 controllerInfo=json['controllerInfo'])
+            static_data.save()
+        except:
+            None
+
+
+    return jsonify({"message": "staticData saved"})
+
+@app.route('/discovery', methods=['GET'])
+def discoveryMethod():
+    ids = []
+    for data in StaticData.objects():
+        ids.append({"rowID": data['controllerInfo']['rowID'], "deviceID": data['deviceID']})
+
+    for id in ids:
+        try:
+            xbee = XbeeDevices.objects.get(deviceID=id['deviceID'])
+            if xbee.rowID == id['rowID']:
+                static = StaticData.objects.get(deviceID=id['deviceID'])
+                static.discovered = True
+                static.save()
+        except:
+            static = StaticData.objects.get(deviceID=id['deviceID'])
+            static.discovered = False
+            static.save()
+    return jsonify({"list": ids})
+
 
 @app.route('/setWifiInfo', methods=["POST"])
 def wifiMethod():
