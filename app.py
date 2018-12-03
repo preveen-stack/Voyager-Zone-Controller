@@ -13,7 +13,12 @@
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 from flask import Flask
 from flask_mqtt import Mqtt
+import json
 from flask import request
+import time
+from flask_cors import CORS
+
+
 
 from flask_cors import CORS
 from optAngle import *
@@ -21,7 +26,8 @@ from pymongo import MongoClient
 
 
 app = Flask(__name__)
-from digi.xbee.devices import XBeeDevice
+from digi.xbee.devices import XBeeDevice, RemoteXBeeDevice, XBee64BitAddress
+from digi.xbee.models.status import NetworkDiscoveryStatus
 import re
 from flask_mongoengine import MongoEngine
 from multiprocessing import Process, Value
@@ -33,19 +39,19 @@ toSend=''
 INIT_DATA="row1lat28lng29stow20 row2lat35lng80stow20"
 
 # TODO: Replace with the serial port where your local module is connected to.
-PORT = "/dev/ttyUSB0"
+PORT = "COM9"
 # TODO: Replace with the baud rate of your local module.
 BAUD_RATE = 9600
 
 app.config.from_pyfile('config.py')
 
-toSend = ''
-mqtt = Mqtt(app)
-# mqtt.subscribe('voyager')
 
 db = MongoEngine(app)
 client = MongoClient('localhost', 27017)
 mongo = client.voyagerDB
+
+#flask-cors initialization
+CORS(app, supports_credentials=True)
 
 @app.route('/sendCommand', methods=['POST'])
 def sendCommandMethod():
@@ -54,145 +60,111 @@ def sendCommandMethod():
     command = content['command']
     trackerID = content['trackerID']
 
-    global toSend
-    toSend = content['payload']
+    if trackerID != "00000000":
+        static_data = StaticData.objects.get(trackerID=trackerID)
+        DID=static_data.deviceID
+        toSend={"CMD":"HMOD","MODE":command,"DID":DID, "TS": str(int(time.time()))}
+        remote_device = RemoteXBeeDevice(device, XBee64BitAddress.from_hex_string(DID))
 
-    print("sending command " + command)
-    mqtt.publish('xbee', 'STOP')
-    return "success"
+        # Send data using the remote object.
+        device.send_data_async(remote_device, json.dumps(toSend))
+    else:
+        DID=trackerID
+        toSend={"CMD":"HMOD","MODE":command,"DID":DID, "TS": str(int(time.time()))}
+        device.send_data_broadcast(json.dumps(toSend))
+        print("broadcasting command " + json.dumps(toSend))
+
+
+
+    return jsonify({"result":"success"})
 
 from views import *
 from models import *
 
 
-@mqtt.on_connect()
-def handle_connect(client, userdata, flags, rc):
-    print('subscribing to topics now')
-    mqtt.subscribe('voyager/site001/zoneA')
+
+def my_data_received_callback(xbee_message):
+    address = xbee_message.remote_device.get_64bit_addr()
+    data = xbee_message.data.decode("utf8")
+    payload = xbee_message.data.decode()
+    payload=json.loads(payload)
+    if (payload['CMD'] == "DPWR"):
+
+        values = payload['VALUES']
+        values = values.split(",")
+
+        static = StaticData.objects.get(deviceID=payload['DID'])
+
+        power_table = PowerTable(trackerID=static.trackerID ,timeStamp=payload['TS'], pvCurrent=values[0], pvVoltage=values[1],
+                                 battCurrent=values[2], battVoltage=values[3])
+        power_table.save()
+    elif (payload['CMD'] == "DSTA"):
+
+        static_data = StaticData.objects.get(deviceID=payload['DID'])
 
 
-@mqtt.on_message()
-def handle_mqtt_message(client, userdata, message):
-    data = dict(
-        topic=message.topic,
-        payload=message.payload.decode()
-    )
-    global toSend
-    toSend = data['payload']
-    print(data)
+        latitude = static_data['controllerInfo']['position']['lat']
+        longitude = static_data['controllerInfo']['position']['lng']
+        azimuth_angle = static_data['controllerInfo']['position']['azimuthDeviation']
+
+        computedAngle = opt_Tilt(latitude, longitude, azimuth_angle)
+        computedAngle = (degrees(computedAngle))
+        status_table = StatusTable(trackerID=static_data.trackerID, timeStamp=payload['TS'], currentMode=payload['MODE'],
+                                   currentAngle=float(payload['ANGLE']), motor=payload['MOTOR'],
+                                   errorCode=payload['ERROR'], calculatedAngle=computedAngle)
+        status_table.save()
 
 
-@mqtt.on_log()
-def handle_logging(client, userdata, level, buf):
-    logged = True
-    # print(level, buf)
+    else:
+        print(payload)
+    print("Received data from %s: %s" % (address, data))
 
-def main():
-    device = XBeeDevice(PORT, BAUD_RATE)
-    print(" +-------------------------------------------------+")
-    print(" | 			ZC 			      |")
-    print(" +-------------------------------------------------+\n")
+@app.route('/discoverDevices', methods=['GET'])
+def discoverDevices():
 
-    try:
-        device.open()
+    xbee_network = device.get_network()
 
-        device.flush_queues()
+    xbee_network.set_discovery_timeout(15)  # 15 seconds.
 
-        print("Waiting for data...\n")
+    xbee_network.clear()
 
-        while True:
-            global toSend
-            if toSend != '':
-                 print("sending broadcast")
-                 device.send_data_broadcast(toSend)
-                 toSend = ''
+    # Callback for discovered devices.  #save device ID to db in seperate collection
+    def callback_device_discovered(remote):
+        did=str(remote)[:-4]
+        print(did)
 
-            if discoverFlagSet:
-                xbee_network = device.get_network()
+        static = StaticData.objects.get(deviceID=did)
+        XbeeDevices.objects.delete()
+        xbee_device = XbeeDevices(deviceID=did, trackerID=static.trackerID)
 
-                xbee_network.set_discovery_timeout(15)  # 15 seconds.
-
-                xbee_network.clear()
-
-                # Callback for discovered devices.  #save device ID to db in seperate collection
-                def callback_device_discovered(remote):
-                    xbee_device = XbeeDevices(deviceID=remote, rowID=row_id)              #TODO how to get row_id?
-                    xbee_device.save()
-                    print("Device discovered: %s" % remote)
-
-                # Callback for discovery finished.
-                def callback_discovery_finished(status):
-                    if status == NetworkDiscoveryStatus.SUCCESS:
-                        print("Discovery process finished successfully.")
-                    else:
-                        print("There was an error discovering devices: %s" % status.description)
-
-                xbee_network.add_device_discovered_callback(callback_device_discovered)
-
-                xbee_network.add_discovery_process_finished_callback(callback_discovery_finished)
-
-                xbee_network.start_discovery_process()
-
-                print("Discovering remote XBee devices...")
-
-                while xbee_network.is_discovery_running():
-                    time.sleep(0.1)
+        xbee_device.save()
 
 
-            xbee_message = device.read_data()
-            if xbee_message is not None:
-                 print("From %s >> %s" % (xbee_message.remote_device.get_64bit_addr(), xbee_message.data.decode()))
-                 payload=xbee_message.data.decode()
-                 if(payload['CMD'] == "DPWR"):
-                    #TODO save date to power table along with timestamp, pv current, pv voltage,
-                    #TODO batt current, battery voltage under payload['VALUES'] as a comma seperated
-                    #TODO string in same order
-                    values = payload['VALUES']
-                    values = values.split(",")
-                        
-                    power_table = PowerTable(timeStamp=payload['TS'], pvCurrent=values[0], pvVoltage=values[1],
-                                             battCurrent=values[2], battVoltage=values[3])
-                    power_table.save()
-                    device.send_data_broadcast(INIT_DATA)
+    # Callback for discovery finished.
+    def callback_discovery_finished(status):
+        if status == NetworkDiscoveryStatus.SUCCESS:
+            print("Discovery process finished successfully.")
+        else:
+            print("There was an error discovering devices: %s" % status.description)
 
-                    print("init data broadcasted")
-                 elif (payload['CMD'] == "DSTA"):
-                     # TODO save date to status table, 5 paramters along with time stamp that are
-                     # TODO payload['MODE'], payload['ANGLE'], payload['MOTOR'], payload['ERROR'], each one
-                     # TODO is received as  string , only angle has to be stored as number
+    xbee_network.add_device_discovered_callback(callback_device_discovered)
 
-                     static_data = StaticData.objects.get(deviceID=payload['DID'])
-                     latitude = static_data['controllerInfo']['position']['lat']
-                     longitude = static_data['controllerInfo']['position']['lng']
-                     azimuth_angle = static_data['controllerInfo']['position']['azimuthDeviation']
+    xbee_network.add_discovery_process_finished_callback(callback_discovery_finished)
 
-                     computedAngle = opt_Tilt(latitude, longitude, azimuth_angle)
-                     computedAngle=(degrees(computedAngle))
-                     status_table = StatusTable(timeStamp=payload['TS'], mode=payload['MODE'],
-                                                angle=float(payload['ANGLE']), motor=payload['MOTOR'],
-                                                error=payload['ERROR'], computedAngle=computedAngle)
-                     status_table.save()
-                     device.send_data_broadcast(INIT_DATA)
+    xbee_network.start_discovery_process()
 
-                     print("init data broadcasted")
+    print("Discovering remote XBee devices...")
 
-                 elif 'angle' in payload:
-                    arr=re.findall(r"[-+]?\d*\.\d+|\d+", payload)
-                    updateData = SimpleUpdate(angle=float(arr[0]), pvVoltage=float(arr[1]), batteryVoltage=float(arr[2]))
-                    updateData.save()
+    while xbee_network.is_discovery_running():
+        time.sleep(0.1)
 
-                    content = request.get_json(force=True)
-                    print(content)
-                    # TODO publish mqtt message to update siteDB
-                    print("message published")
-                 else:
-                    print(payload)
-    finally:
-        if device is not None and device.is_open():
-            device.close()
+    return jsonify({"result":"success","data": XbeeDevices.objects()})
+
+device = XBeeDevice(PORT, BAUD_RATE)
+device.open()
+device.add_data_received_callback(my_data_received_callback)
+
+
 
 if __name__ == '__main__':
-    p = Process(target=main)
-    p.start()
     app.run(host='0.0.0.0', port=6050, debug=True, use_reloader=True)
-    p.join()

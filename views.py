@@ -2,8 +2,6 @@ from app import app
 from models import *
 import json
 from flask import jsonify, request
-import datetime
-from werkzeug import secure_filename
 
 def getJSON(filePath):
     with open(filePath, 'r') as fp:
@@ -14,12 +12,12 @@ def commisioningMethod():
     static_objects = []
     ids = []
     for data in StaticData.objects():
-        ids.append({"rowID": data['controllerInfo']['rowID'], "deviceID": data['deviceID']})
+        ids.append({"trackerID": data['trackerID'], "deviceID": data['deviceID']})
 
     for id in ids:
         try:
             xbee = XbeeDevices.objects.get(deviceID=id['deviceID'])
-            if xbee.rowID == id['rowID']:
+            if xbee.trackerID == id['trackerID']:
                 static = StaticData.objects.get(deviceID=id['deviceID'])
                 static.discovered = True
                 static.save()
@@ -122,12 +120,12 @@ def loadStaticDataMethod():
 def discoveryMethod():
     ids = []
     for data in StaticData.objects():
-        ids.append({"rowID": data['controllerInfo']['rowID'], "deviceID": data['deviceID']})
+        ids.append({"trackerID": data['trackerID'], "deviceID": data['deviceID']})
 
     for id in ids:
         try:
             xbee = XbeeDevices.objects.get(deviceID=id['deviceID'])
-            if xbee.rowID == id['rowID']:
+            if xbee.trackerID == id['trackerID']:
                 static = StaticData.objects.get(deviceID=id['deviceID'])
                 static.discovered = True
                 static.save()

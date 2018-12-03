@@ -98,7 +98,7 @@ class StaticData(db.Document):
 
 class XbeeDevices(db.Document):
     deviceID = db.StringField()
-    rowID = db.StringField()
+    trackerID = db.StringField()
     meta = {'collection': 'xbeeDevices'}
 
 class Trends(db.Document):
