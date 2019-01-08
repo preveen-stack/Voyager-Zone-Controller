@@ -72,6 +72,7 @@ class Sensor(db.Document):
     type = db.StringField()
     zone = db.StringField()
     timeStamp = db.StringField()
+    rainSpeed = db.FloatField()
 
 class PowerTable(db.Document):
     trackerID = db.StringField()
