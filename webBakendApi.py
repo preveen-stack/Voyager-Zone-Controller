@@ -105,6 +105,11 @@ class XbeeDevices(db.Document):
     trackerID = db.StringField()
     meta = {'collection': 'xbeeDevices'}
 
+class Logs(db.Document):
+    log = db.StringField()
+    timeStamp = db.StringField()
+    meta = {'collection': 'logs'}
+
 class Wifi(db.Document):
     ssid = db.StringField()
     password = db.StringField()
@@ -285,6 +290,13 @@ def discoveryMethod():
             static.save()
     return jsonify({"list": ids})
 
+@app.route('/getLog/<timeStamp>', methods=['GET'])
+def getLogMethod(timeStamp):
+    logs=[]
+    for log in Logs.objects():
+        if log.timeStamp >= timeStamp:
+           logs.append({"log":log.log, "timeStamp": log.timeStamp})
+    return jsonify(logs)
 
 @app.route('/setWifiInfo', methods=["POST"])
 def wifiMethod():
