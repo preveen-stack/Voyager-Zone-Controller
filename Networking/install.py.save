@@ -1,0 +1,41 @@
+import subprocess
+
+#subprocess.call(["sudo","apt-get","update"])
+#subprocess.call(["sudo","apt-get","upgrade"])
+#subprocess.call(["sudo","apt-get","install","mongodb"])
+#subprocess.call(["sudo","apt-get","install","python-pip"])
+#subprocess.call(["pip","install","pymongo"])
+#subprocess.call(["sudo","mongod"])
+
+
+from pymongo import MongoClient
+
+#from MongoEngine import *
+
+#client=MongoClient('localhost', 27017)
+#db = client['voyagerDB']
+#collection = db['config']
+doc={"name":"configuration","ssid":"0","password":"0","zoneid":"0"}
+x = collection.insert_one(doc)
+
+
+subprocess.call(["sudo","apt-get","install","dnsmasq","hostapd"])
+subprocess.call(["sudo","systemctl","stop","dnsmasq"])
+subprocess.call(["sudo","systemctl","stop","hostapd"])
+
+
+subprocess.call(["sudo","mv","/etc/dnsmasq.conf","/etc/dnsmasq.conf.orig"])
+with open("/etc/hostapd/hostapd.conf", "a") as myfile:
+    myfile.write("interface=wlan0 \n   dhcp-range=192.168.4.2,192.168.4.20,255.255.255.0,24h")
+with open("/etc/hostapd/hostapd.conf", "a") as myfile:
+    myfile.write("interface=wlan0\ndriver=nl80211\nssid=rpihotspot\nhw_mode=g\nchannel=7\nwmm_enabled=0\nmacaddr_acl=0\nauth_algs=1\nignore_broadcast_ssid=0\nwpa=2\nwpa_passphrase=whatever\nwpa_key_mgmt=WPA-PSK\nwpa_pairwise=TKIP\nrsn_pairwise=CCMP")
+
+s = open("etc/default/hostapd").read()
+s = s.replace('#DAEMON_CONF=\"/etc/hostapd/hostapd.conf\"','DAEMON_CONF=\"/etc/hostapd/hostapd.conf\"')
+f = open("etc/default/hostapd",'w')
+f.write(s)
+f.close()
+
+
+
+

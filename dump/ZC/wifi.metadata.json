@@ -1,0 +1,1 @@
+{"options":{"capped":true,"size":256,"max":1},"indexes":[{"v":2,"key":{"_id":1},"name":"_id_","ns":"ZC.wifi"}],"uuid":"1cfb2c13dff2482a8a1fb55531cf9945"}

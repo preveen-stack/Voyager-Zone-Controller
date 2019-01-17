@@ -1,0 +1,55 @@
+import pymongo
+import subprocess
+subprocess.call(["sudo","cp","-f","/home/pi/ftc_commisioning/wpa_supplicant.conf","/etc/wpa_supplicant/wpa_supplicant.conf"])
+isScriptRun=False
+subprocess(["sudo","mongod","--repair"])
+#subprocess(["sudo","mongod"])
+
+connection = pymongo.MongoClient('localhost', 27107)
+db = connection['voyagerDB']
+collection = db['config']
+credentials = collection.find({"name": "configuration"})
+
+
+if credentials['password'] != 0
+    target = '\nnetwork={\n\tssid=\"' + credentials.ssid + '\"\n\tkey_mgmt=WPA-PSK\n\tpsk=\"' + credentials.password + '\"\n}\n'
+	
+    if '#net.ipv4.ip_forward=1' in open('/etc/sysctl.conf').read():
+        pass
+
+    else :
+        s2=open("/etc/sysctl.conf").read()
+        s2=s2.replace('net.ipv4.ip_forward=1','#net.ipv4.ip_forward=1')
+        f2=open("/etc/sysctl.conf",'w')
+        f2.write(s2)
+        f2.close()
+        
+    with open("/etc/wpa_supplicant/wpa_supplicant.conf", "a") as myfile:
+        myfile.write(target)
+    subprocess.call(["sudo", "cp", "-f","/home/pi/ftc_comisioning/dhcpcd.conf","/etc/dhcpcd.conf"])
+    subprocess.call(["sudo", "systemctl", "stop","hostapd"])
+    subprocess.call(["sudo", "systemctl", "stop","dnsmasq"])
+    subprocess.call(["sudo", "service", "daemon-reload"])
+    subprocess.call(["sudo","service","restart","dhcpcd"])
+    #run host app
+	
+	   
+	
+	    			
+			
+			
+else :
+    print("yay")
+ #   if isScriptRun :
+  #      subprocess.call(["iptables-restore","<","/etc/iptables.ipv4.nat"])
+   #     isScriptRun=False
+#	subprocess.call(["sudo","python","/etc/home/pi/ftc_commisioning/webapp/app.py"])
+		
+		
+ #   else :
+  #      subprocess.call(["sudo","python","/home/pi/ftc_commisioning/APscript.py"])
+		
+
+
+
+
